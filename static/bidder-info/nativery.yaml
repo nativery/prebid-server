@@ -1,0 +1,13 @@
+endpoint: ""
+maintainer:
+  email: "andrea.fassina@nativery.com"
+disabled: true
+capabilities:
+  site:
+    mediaTypes:
+      - banner
+      - native
+userSync:
+  key: 
+  redirect:
+    
