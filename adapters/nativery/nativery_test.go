@@ -7,9 +7,10 @@ import (
 	"github.com/prebid/prebid-server/v2/config"
 	"github.com/prebid/prebid-server/v2/openrtb_ext"
 )
+
 func TestJsonSamples(t *testing.T) {
 	bidder, buildErr := Builder(openrtb_ext.BidderNativery, config.Adapter{
-		Endpoint: ""}, config.Server{ExternalUrl: "http://hosturl.com", GvlID: 1, DataCenter: "2"})
+		Endpoint: "http://example.com/hb"}, config.Server{ExternalUrl: "http://hosturl.com", GvlID: 1, DataCenter: "2"})
 
 	if buildErr != nil {
 		t.Fatalf("Builder returned unexpected error %v", buildErr)

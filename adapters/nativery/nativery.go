@@ -9,7 +9,9 @@ import (
 	"github.com/prebid/openrtb/v20/openrtb2"
 	"github.com/prebid/prebid-server/v2/adapters"
 	"github.com/prebid/prebid-server/v2/config"
+	"github.com/prebid/prebid-server/v2/metrics"
 	"github.com/prebid/prebid-server/v2/openrtb_ext"
+	"github.com/prebid/prebid-server/v2/util/maputil"
 )
 
 // Function used to  builds a new instance of the Nativery adapter for the given bidder with the given config.
@@ -25,47 +27,87 @@ func Builder(bidderName openrtb_ext.BidderName, config config.Adapter, server co
 // It generates requests for each ad exchange targeted by the BidRequest,
 // serializes the BidRequest into the request body, and sets the appropriate
 // HTTP headers and other parameters.
-func (a *adapter) MakeRequests(request *openrtb2.BidRequest, reqInfo *adapters.ExtraRequestInfo) (adapterRequests []*adapters.RequestData, errs []error) {
+func (a *adapter) MakeRequests(request *openrtb2.BidRequest, reqInfo *adapters.ExtraRequestInfo) ([]*adapters.RequestData, []error) {
 	reqCopy := *request
-
-	// generate request for all the impressions
-	for _, imp := range request.Imp {
-		reqCopy.Imp = []openrtb2.Imp{imp}
-		adapterReq, errs := a.makeRequest(reqCopy)
-		if adapterReq != nil && len(errs) == 0 {
-			adapterRequests = append(adapterRequests, adapterReq)
-		}
-	}
-	return
-}
-
-// utility function used to build the http request for a single impression
-func (a *adapter) makeRequest(reqCopy openrtb2.BidRequest) (*adapters.RequestData, []error) {
 	var errs []error
 
-	// build request body
-	reqExtBody, err := buildExtBody(reqCopy)
-	if err != nil {
-		errs = append(errs, err)
-		return nil, errs
+	// check if the request come from AMP
+	var isAMP int
+	if reqInfo.PbsEntryPoint == metrics.ReqTypeAMP {
+		isAMP = 1
 	}
-	// Last Step
-	reqJSON, err := json.Marshal(reqExtBody)
-	if err != nil {
-		errs = append(errs, err)
+
+	// attach body request for all the impressions
+	validImps := []openrtb2.Imp{}
+	for _, imp := range request.Imp {
+		reqCopy.Imp = []openrtb2.Imp{imp}
+
+		nativeryExt, err := buildNativeryExt(&reqCopy.Imp[0])
+		if err != nil {
+			errs = append(errs, err)
+			continue
+		}
+
+		if err := buildRequest(reqCopy, nativeryExt); err != nil {
+			errs = append(errs, err)
+			continue
+		}
+
+		validImps = append(validImps, reqCopy.Imp...)
+
+	}
+
+	reqCopy.Imp = validImps
+	// If all the requests were malformed, don't bother making a server call with no impressions.
+	if len(reqCopy.Imp) == 0 {
 		return nil, errs
 	}
 
-	headers := http.Header{}
-	headers.Add("Content-Type", "application/json;charset=utf-8")
-	headers.Add("Accept", "application/json")
+	reqExt, err := getRequestExt(reqCopy.Ext)
+	if err != nil {
+		return nil, append(errs, err)
+	}
 
-	return &adapters.RequestData{
-		Method:  "POST",
-		Uri:     a.endpoint,
-		Body:    reqJSON,
-		Headers: headers,
-	}, errs
+	reqExtNativery, err := getNativeryExt(reqExt, isAMP)
+	if err != nil {
+		return nil, append(errs, err)
+	}
+	// TODO: optimize it, we reiterate imp there and before
+	adapterRequests, errors := splitRequests(reqCopy.Imp, &reqCopy, reqExt, reqExtNativery, a.endpoint)
+
+	return adapterRequests, append(errs, errors...)
+}
+
+func buildNativeryExt(imp *openrtb2.Imp) (openrtb_ext.ImpExtNativery, error) {
+	var bidderExt adapters.ExtImpBidder
+	if err := json.Unmarshal(imp.Ext, &bidderExt); err != nil {
+		return openrtb_ext.ImpExtNativery{}, err
+	}
+
+	var nativeryExt openrtb_ext.ImpExtNativery
+	if err := json.Unmarshal(bidderExt.Bidder, &nativeryExt); err != nil {
+		return openrtb_ext.ImpExtNativery{}, err
+	}
+
+	return nativeryExt, nil
+}
+
+// utility function used to build the body for the http request for a single impression
+func buildRequest(reqCopy openrtb2.BidRequest, reqExt openrtb_ext.ImpExtNativery) error {
+
+	impExt := impExt{Nativery: nativeryExtReqBody{
+		Id:  reqExt.PlacementID,
+		Xhr: 2,
+		V:   3,
+		// TODO: Site is only for browser request, we have to handle if the req comes from app or dooh
+		Ref:    reqCopy.Site.Page,
+		RefRef: refRef{Page: reqCopy.Site.Page, Ref: reqCopy.Site.Ref},
+	}}
+
+	var err error
+	reqCopy.Imp[0].Ext, err = json.Marshal(&impExt)
+
+	return err
 }
 
 // makebids handles the entire bidding process for a single BidRequest.
@@ -96,6 +138,7 @@ func (a *adapter) MakeBids(internalRequest *openrtb2.BidRequest, externalRequest
 		for i := range sb.Bid {
 			bid := sb.Bid[i]
 
+			// should be data sended from nativery server to partecipate to the auction
 			var bidExt bidExt
 			if err := json.Unmarshal(bid.Ext, &bidExt); err != nil {
 				errs = append(errs, err)
@@ -107,21 +150,14 @@ func (a *adapter) MakeBids(internalRequest *openrtb2.BidRequest, externalRequest
 				errs = append(errs, err)
 				continue
 			}
-
-			/* TODO: we have to implement this?
-			iabCategory, found := a.findIabCategoryForBid(&bidExt)
-			if found {
-				bid.Cat = []string{iabCategory}
-			} else if len(bid.Cat) > 1 {
-				//create empty categories array to force bid to be rejected
-				bid.Cat = []string{}
-			} */
+			// get metadata
+			bidMeta := buildBidMeta(string(bidType), bidExt.Nativery.BidAdvDomains)
 
 			bidderResponse.Bids = append(bidderResponse.Bids, &adapters.TypedBid{
-				Bid:          &bid,
-				BidType:      bidType,
-				BidVideo:     &openrtb_ext.ExtBidPrebidVideo{Duration: bidExt.Nativery.CreativeInfo.Video.Duration},
-				DealPriority: bidExt.Nativery.DealPriority, // we need it?
+				Bid:     &bid,
+				BidType: bidType,
+				// metadata is encouraged
+				BidMeta: bidMeta,
 			})
 		}
 
@@ -140,39 +176,109 @@ func (a *adapter) MakeBids(internalRequest *openrtb2.BidRequest, externalRequest
 // getMediaTypeForBid switch nativery type in bid type.
 func getMediaTypeForBid(bid *bidExt) (openrtb_ext.BidType, error) {
 	switch bid.Nativery.BidType {
+	case "native":
+		return openrtb_ext.BidTypeNative, nil
 	case "display":
 		return openrtb_ext.BidTypeBanner, nil
 	case "video":
 		return openrtb_ext.BidTypeVideo, nil
-	case "native":
-		return openrtb_ext.BidTypeNative, nil
 	default:
 		return "", fmt.Errorf("unrecognized bid_ad_media_type in response from nativery: %s", bid.Nativery.BidType)
 	}
 }
 
-// utility function used to build the body about the external request
-func buildExtBody(reqData openrtb2.BidRequest) (nativeryExtReqBody, error) {
-	var err error
-	var bidderExt adapters.ExtImpBidder
-	var natExt openrtb_ext.ImpExtNativery
+func convertIntToBoolean(num *int) bool {
+	var b bool
+	// Dereferenzia num usando *
+	if num != nil && *num == 1 {
+		b = true
+	} else {
+		b = false
+	}
+	return b
+}
 
-	if err = json.Unmarshal(reqData.Imp[0].Ext, &bidderExt); err != nil {
-		return nativeryExtReqBody{}, err
+func buildBidMeta(mediaType string, advDomain []string) *openrtb_ext.ExtBidPrebidMeta {
+
+	//advertiserDomains and dchain are encouraged to implements
+	return &openrtb_ext.ExtBidPrebidMeta{
+		MediaType:         mediaType,
+		AdvertiserDomains: advDomain,
+		/*
+			DChain: json.RawMessage{} ,
+			Cosa include Dchain:
+				nodes: Un array di oggetti che rappresentano i diversi partecipanti alla catena di domanda.
+				complete: Un flag che indica se la catena di domanda è completa (1) o incompleta (0).
+				ver: La versione del modulo Dchain utilizzato.
+		*/
 	}
-	if err = json.Unmarshal(bidderExt.Bidder, &natExt); err != nil {
-		return nativeryExtReqBody{}, err
-	}
-	reqExtBody := nativeryExtReqBody{
-		Id:     natExt.PlacementID,
-		Xhr:    2,
-		V:      3,
-		Gcid:   "clientId",
-		Gsid:   "sessionId",
-		Ref:    "",
-		Refref: refRef{page: "", ref: ""},
-		Imp:    reqData.Imp,
+}
+
+func splitRequests(imps []openrtb2.Imp, request *openrtb2.BidRequest, requestExt map[string]json.RawMessage, requestExtNativery bidReqExtNativery, uri string) ([]*adapters.RequestData, []error) {
+	var errs []error
+
+	resArr := make([]*adapters.RequestData, 0, 1)
+
+	headers := http.Header{}
+	headers.Add("Content-Type", "application/json;charset=utf-8")
+	headers.Add("Accept", "application/json")
+
+	nativeryExtJson, err := json.Marshal(requestExtNativery)
+	if err != nil {
+		errs = append(errs, err)
 	}
 
-	return reqExtBody, nil
+	requestExtClone := maputil.Clone(requestExt)
+	requestExtClone["nativery"] = nativeryExtJson
+
+	request.Ext, err = json.Marshal(requestExtClone)
+	if err != nil {
+		errs = append(errs, err)
+	}
+
+	for _, imp := range imps {
+		impsForReq := []openrtb2.Imp{imp}
+		request.Imp = impsForReq
+
+		reqJSON, err := json.Marshal(request)
+		if err != nil {
+			errs = append(errs, err)
+			return nil, errs
+		}
+
+		resArr = append(resArr, &adapters.RequestData{
+			Method:  "POST",
+			Uri:     uri,
+			Body:    reqJSON,
+			Headers: headers,
+		})
+	}
+	return resArr, errs
+}
+
+func getRequestExt(ext json.RawMessage) (map[string]json.RawMessage, error) {
+	extMap := make(map[string]json.RawMessage)
+
+	if len(ext) > 0 {
+		if err := json.Unmarshal(ext, &extMap); err != nil {
+			return nil, err
+		}
+	}
+
+	return extMap, nil
+}
+
+func getNativeryExt(extMap map[string]json.RawMessage, isAMP int) (bidReqExtNativery, error) {
+	var nativeryExt bidReqExtNativery
+
+	// if ext.nativery already exists return it
+	if nativeryExtJson, exists := extMap["nativery"]; exists && len(nativeryExtJson) > 0 {
+		if err := json.Unmarshal(nativeryExtJson, &nativeryExt); err != nil {
+			return nativeryExt, err
+		}
+	}
+
+	nativeryExt.IsAMP = convertIntToBoolean(&isAMP)
+
+	return nativeryExt, nil
 }

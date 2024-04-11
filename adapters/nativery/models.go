@@ -1,40 +1,37 @@
 package nativery
 
-import "github.com/prebid/openrtb/v20/openrtb2"
-
 type adapter struct {
 	endpoint string
 }
 
 type refRef struct {
-	page string
-	ref  string
+	Page string `json:"page"`
+	Ref  string `json:"ref"`
 }
+
+// request body to send to widget server in ext
 type nativeryExtReqBody struct {
-	Id     string         `json:"id"` //the placement/widget id
-	Xhr    int            `json:"xhr"`
-	V      int            `json:"v"`
-	Gcid   string         `json:"gcid"` //gma clientId
-	Gsid   string         `json:"gsid"` //gma sessionId
-	Ref    string         `json:"ref"`
-	Refref refRef         `json:"refref"`
-	Imp    []openrtb2.Imp `json:"imp"` //the request impression
+	Id     string `json:"id"` //the placement/widget id
+	Xhr    int    `json:"xhr"`
+	V      int    `json:"v"`
+	Ref    string `json:"ref"`
+	RefRef refRef `json:"refref"`
 }
 
-type bidExtVideo struct {
-	Duration int `json:"duration"`
+type impExt struct {
+	Nativery nativeryExtReqBody `json:"nativery"`
 }
 
-type bidExtCreative struct {
-	Video bidExtVideo `json:"video"`
+type bidReqExtNativery struct {
+	IsAMP bool `json:"is_amp"`
 }
 
 type bidExtNativery struct {
-	BidType       string         `json:"bid_ad_media_type"`
-	BrandId       int            `json:"brand_id"`
-	BrandCategory int            `json:"brand_category_id"`
-	CreativeInfo  bidExtCreative `json:"creative_info"`
-	DealPriority  int            `json:"deal_priority"`
+	BidType       string   `json:"bid_ad_media_type"`
+	BidAdvDomains []string `json:"bid_adv_domains"`
+
+	BrandId       int `json:"brand_id,omitempty"`
+	BrandCategory int `json:"brand_category_id,omitempty"`
 }
 
 type bidExt struct {
