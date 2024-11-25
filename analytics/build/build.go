@@ -1,17 +1,19 @@
 package build
 
 import (
+	"encoding/json"
+
 	"github.com/benbjohnson/clock"
 	"github.com/golang/glog"
-	"github.com/prebid/prebid-server/v2/analytics"
-	"github.com/prebid/prebid-server/v2/analytics/agma"
-	"github.com/prebid/prebid-server/v2/analytics/clients"
-	"github.com/prebid/prebid-server/v2/analytics/filesystem"
-	"github.com/prebid/prebid-server/v2/analytics/pubstack"
-	"github.com/prebid/prebid-server/v2/config"
-	"github.com/prebid/prebid-server/v2/openrtb_ext"
-	"github.com/prebid/prebid-server/v2/ortb"
-	"github.com/prebid/prebid-server/v2/privacy"
+	"github.com/prebid/prebid-server/v3/analytics"
+	"github.com/prebid/prebid-server/v3/analytics/agma"
+	"github.com/prebid/prebid-server/v3/analytics/clients"
+	"github.com/prebid/prebid-server/v3/analytics/filesystem"
+	"github.com/prebid/prebid-server/v3/analytics/pubstack"
+	"github.com/prebid/prebid-server/v3/config"
+	"github.com/prebid/prebid-server/v3/openrtb_ext"
+	"github.com/prebid/prebid-server/v3/ortb"
+	"github.com/prebid/prebid-server/v3/privacy"
 )
 
 // Modules that need to be logged to need to be initialized here
@@ -66,7 +68,11 @@ func (ea enabledAnalytics) LogAuctionObject(ao *analytics.AuctionObject, ac priv
 			if cloneBidderReq != nil {
 				ao.RequestWrapper = cloneBidderReq
 			}
+			cloneReq := updateReqWrapperForAnalytics(ao.RequestWrapper, name, cloneBidderReq != nil)
 			module.LogAuctionObject(ao)
+			if cloneReq != nil {
+				ao.RequestWrapper = cloneReq
+			}
 		}
 	}
 }
@@ -77,7 +83,11 @@ func (ea enabledAnalytics) LogVideoObject(vo *analytics.VideoObject, ac privacy.
 			if cloneBidderReq != nil {
 				vo.RequestWrapper = cloneBidderReq
 			}
+			cloneReq := updateReqWrapperForAnalytics(vo.RequestWrapper, name, cloneBidderReq != nil)
 			module.LogVideoObject(vo)
+			if cloneReq != nil {
+				vo.RequestWrapper = cloneReq
+			}
 		}
 
 	}
@@ -101,7 +111,11 @@ func (ea enabledAnalytics) LogAmpObject(ao *analytics.AmpObject, ac privacy.Acti
 			if cloneBidderReq != nil {
 				ao.RequestWrapper = cloneBidderReq
 			}
+			cloneReq := updateReqWrapperForAnalytics(ao.RequestWrapper, name, cloneBidderReq != nil)
 			module.LogAmpObject(ao)
+			if cloneReq != nil {
+				ao.RequestWrapper = cloneReq
+			}
 		}
 	}
 }
@@ -112,6 +126,13 @@ func (ea enabledAnalytics) LogNotificationEventObject(ne *analytics.Notification
 		if ac.Allow(privacy.ActivityReportAnalytics, component, privacy.ActivityRequest{}) {
 			module.LogNotificationEventObject(ne)
 		}
+	}
+}
+
+// Shutdown - correctly shutdown all analytics modules and wait for them to finish
+func (ea enabledAnalytics) Shutdown() {
+	for _, module := range ea {
+		module.Shutdown()
 	}
 }
 
@@ -143,4 +164,49 @@ func evaluateActivities(rw *openrtb_ext.RequestWrapper, ac privacy.ActivityContr
 
 	cloneReq.RebuildRequest()
 	return true, cloneReq
+}
+
+func updateReqWrapperForAnalytics(rw *openrtb_ext.RequestWrapper, adapterName string, isCloned bool) *openrtb_ext.RequestWrapper {
+	if rw == nil {
+		return nil
+	}
+	reqExt, _ := rw.GetRequestExt()
+	reqExtPrebid := reqExt.GetPrebid()
+	if reqExtPrebid == nil {
+		return nil
+	}
+
+	var cloneReq *openrtb_ext.RequestWrapper
+	if !isCloned {
+		cloneReq = &openrtb_ext.RequestWrapper{BidRequest: ortb.CloneBidRequestPartial(rw.BidRequest)}
+	} else {
+		cloneReq = nil
+	}
+
+	if len(reqExtPrebid.Analytics) == 0 {
+		return cloneReq
+	}
+
+	// Remove the entire analytics object if the adapter module is not present
+	if _, ok := reqExtPrebid.Analytics[adapterName]; !ok {
+		reqExtPrebid.Analytics = nil
+	} else {
+		reqExtPrebid.Analytics = updatePrebidAnalyticsMap(reqExtPrebid.Analytics, adapterName)
+	}
+	reqExt.SetPrebid(reqExtPrebid)
+	rw.RebuildRequest()
+
+	if cloneReq != nil {
+		cloneReq.RebuildRequest()
+	}
+
+	return cloneReq
+}
+
+func updatePrebidAnalyticsMap(extPrebidAnalytics map[string]json.RawMessage, adapterName string) map[string]json.RawMessage {
+	newMap := make(map[string]json.RawMessage)
+	if val, ok := extPrebidAnalytics[adapterName]; ok {
+		newMap[adapterName] = val
+	}
+	return newMap
 }

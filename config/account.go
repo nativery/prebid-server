@@ -7,8 +7,8 @@ import (
 	"strings"
 
 	"github.com/prebid/go-gdpr/consentconstants"
-	"github.com/prebid/prebid-server/v2/openrtb_ext"
-	"github.com/prebid/prebid-server/v2/util/iputil"
+	"github.com/prebid/prebid-server/v3/openrtb_ext"
+	"github.com/prebid/prebid-server/v3/util/iputil"
 )
 
 // ChannelType enumerates the values of integrations Prebid Server can configure for an account
@@ -335,18 +335,27 @@ func (m AccountModules) ModuleConfig(id string) (json.RawMessage, error) {
 
 type AccountPrivacy struct {
 	AllowActivities *AllowActivities `mapstructure:"allowactivities" json:"allowactivities"`
+	DSA             *AccountDSA      `mapstructure:"dsa" json:"dsa"`
 	IPv6Config      IPv6             `mapstructure:"ipv6" json:"ipv6"`
 	IPv4Config      IPv4             `mapstructure:"ipv4" json:"ipv4"`
 	PrivacySandbox  PrivacySandbox   `mapstructure:"privacysandbox" json:"privacysandbox"`
 }
 
 type PrivacySandbox struct {
+	TopicsDomain      string            `mapstructure:"topicsdomain"`
 	CookieDeprecation CookieDeprecation `mapstructure:"cookiedeprecation"`
 }
 
 type CookieDeprecation struct {
 	Enabled bool `mapstructure:"enabled"`
 	TTLSec  int  `mapstructure:"ttl_sec"`
+}
+
+// AccountDSA represents DSA configuration
+type AccountDSA struct {
+	Default         string `mapstructure:"default" json:"default"`
+	DefaultUnpacked *openrtb_ext.ExtRegsDSA
+	GDPROnly        bool `mapstructure:"gdpr_only" json:"gdpr_only"`
 }
 
 type IPv6 struct {

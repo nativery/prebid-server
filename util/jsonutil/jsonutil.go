@@ -9,7 +9,7 @@ import (
 
 	jsoniter "github.com/json-iterator/go"
 	"github.com/modern-go/reflect2"
-	"github.com/prebid/prebid-server/v2/errortypes"
+	"github.com/prebid/prebid-server/v3/errortypes"
 )
 
 var comma = byte(',')
@@ -228,7 +228,7 @@ func (e *RawMessageExtension) CreateEncoder(typ reflect2.Type) jsoniter.ValEncod
 	return nil
 }
 
-var jsonRawMessageType = reflect2.TypeOfPtr(&json.RawMessage{}).Elem()
+var jsonRawMessageType = reflect2.TypeOfPtr((*json.RawMessage)(nil)).Elem()
 
 // rawMessageCodec implements jsoniter.ValEncoder interface so we can override the default json.RawMessage Encode()
 // function with our implementation

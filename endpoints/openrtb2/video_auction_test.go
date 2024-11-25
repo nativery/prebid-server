@@ -11,20 +11,21 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/prebid/prebid-server/v2/analytics"
-	analyticsBuild "github.com/prebid/prebid-server/v2/analytics/build"
-	"github.com/prebid/prebid-server/v2/config"
-	"github.com/prebid/prebid-server/v2/errortypes"
-	"github.com/prebid/prebid-server/v2/exchange"
-	"github.com/prebid/prebid-server/v2/hooks"
-	"github.com/prebid/prebid-server/v2/metrics"
-	metricsConfig "github.com/prebid/prebid-server/v2/metrics/config"
-	"github.com/prebid/prebid-server/v2/openrtb_ext"
-	"github.com/prebid/prebid-server/v2/prebid_cache_client"
-	"github.com/prebid/prebid-server/v2/privacy"
-	"github.com/prebid/prebid-server/v2/stored_requests/backends/empty_fetcher"
-	"github.com/prebid/prebid-server/v2/util/jsonutil"
-	"github.com/prebid/prebid-server/v2/util/ptrutil"
+	"github.com/prebid/prebid-server/v3/analytics"
+	analyticsBuild "github.com/prebid/prebid-server/v3/analytics/build"
+	"github.com/prebid/prebid-server/v3/config"
+	"github.com/prebid/prebid-server/v3/errortypes"
+	"github.com/prebid/prebid-server/v3/exchange"
+	"github.com/prebid/prebid-server/v3/hooks"
+	"github.com/prebid/prebid-server/v3/metrics"
+	metricsConfig "github.com/prebid/prebid-server/v3/metrics/config"
+	"github.com/prebid/prebid-server/v3/openrtb_ext"
+	"github.com/prebid/prebid-server/v3/ortb"
+	"github.com/prebid/prebid-server/v3/prebid_cache_client"
+	"github.com/prebid/prebid-server/v3/privacy"
+	"github.com/prebid/prebid-server/v3/stored_requests/backends/empty_fetcher"
+	"github.com/prebid/prebid-server/v3/util/jsonutil"
+	"github.com/prebid/prebid-server/v3/util/ptrutil"
 
 	"github.com/prebid/openrtb/v20/adcom1"
 	"github.com/prebid/openrtb/v20/openrtb2"
@@ -155,7 +156,7 @@ func TestCreateBidExtensionTargeting(t *testing.T) {
 	require.NotNil(t, ex.lastRequest, "The request never made it into the Exchange.")
 
 	// assert targeting set to default
-	expectedRequestExt := `{"prebid":{"cache":{"vastxml":{}},"targeting":{"pricegranularity":{"precision":2,"ranges":[{"min":0,"max":20,"increment":0.1}]},"mediatypepricegranularity":{},"includebidderkeys":true,"includewinners":true,"includebrandcategory":{"primaryadserver":1,"publisher":"","withcategory":true}}}}`
+	expectedRequestExt := `{"prebid":{"cache":{"vastxml":{}},"targeting":{"pricegranularity":{"precision":2,"ranges":[{"min":0,"max":20,"increment":0.1}]},"includebidderkeys":true,"includewinners":true,"includebrandcategory":{"primaryadserver":1,"withcategory":true}}}}`
 	assert.JSONEq(t, expectedRequestExt, string(ex.lastRequest.Ext))
 }
 
@@ -813,15 +814,15 @@ func TestHandleError(t *testing.T) {
 				&errortypes.AccountDisabled{},
 			},
 			wantCode:          503,
-			wantMetricsStatus: metrics.RequestStatusBlacklisted,
+			wantMetricsStatus: metrics.RequestStatusBlockedApp,
 		},
 		{
 			description: "Blocked app - return 503 with blocked metrics status",
 			giveErrors: []error{
-				&errortypes.BlacklistedApp{},
+				&errortypes.BlockedApp{},
 			},
 			wantCode:          503,
-			wantMetricsStatus: metrics.RequestStatusBlacklisted,
+			wantMetricsStatus: metrics.RequestStatusBlockedApp,
 		},
 		{
 			description: "Account required error - return 400 with bad input metrics status",
@@ -1090,14 +1091,11 @@ func TestCCPA(t *testing.T) {
 		if ex.lastRequest == nil {
 			t.Fatalf("%s: The request never made it into the exchange.", test.description)
 		}
-		extRegs := &openrtb_ext.ExtRegs{}
-		if err := jsonutil.UnmarshalValid(ex.lastRequest.Regs.Ext, extRegs); err != nil {
-			t.Fatalf("%s: Failed to unmarshal reg.ext in request to the exchange: %v", test.description, err)
-		}
+
 		if test.expectConsentString {
-			assert.Len(t, extRegs.USPrivacy, 4, test.description+":consent")
+			assert.Len(t, ex.lastRequest.Regs.USPrivacy, 4, test.description+":consent")
 		} else if test.expectEmptyConsent {
-			assert.Empty(t, extRegs.USPrivacy, test.description+":consent")
+			assert.Empty(t, ex.lastRequest.Regs.USPrivacy, test.description+":consent")
 		}
 
 		// Validate HTTP Response
@@ -1162,6 +1160,7 @@ func TestVideoAuctionResponseHeaders(t *testing.T) {
 	testCases := []struct {
 		description     string
 		givenTestFile   string
+		givenHeader     map[string]string
 		expectedStatus  int
 		expectedHeaders func(http.Header)
 	}{
@@ -1173,12 +1172,34 @@ func TestVideoAuctionResponseHeaders(t *testing.T) {
 				h.Set("X-Prebid", "pbs-go/unknown")
 				h.Set("Content-Type", "application/json")
 			},
-		}, {
+		},
+		{
 			description:    "Failure Response",
 			givenTestFile:  "sample-requests/video/video_invalid_sample.json",
 			expectedStatus: 500,
 			expectedHeaders: func(h http.Header) {
 				h.Set("X-Prebid", "pbs-go/unknown")
+			},
+		},
+		{
+			description:    "Success Response with header Observe-Browsing-Topics",
+			givenTestFile:  "sample-requests/video/video_valid_sample.json",
+			givenHeader:    map[string]string{secBrowsingTopics: "anyValue"},
+			expectedStatus: 200,
+			expectedHeaders: func(h http.Header) {
+				h.Set("X-Prebid", "pbs-go/unknown")
+				h.Set("Content-Type", "application/json")
+				h.Set("Observe-Browsing-Topics", "?1")
+			},
+		},
+		{
+			description:    "Failure Response with header Observe-Browsing-Topics",
+			givenTestFile:  "sample-requests/video/video_invalid_sample.json",
+			givenHeader:    map[string]string{secBrowsingTopics: "anyValue"},
+			expectedStatus: 500,
+			expectedHeaders: func(h http.Header) {
+				h.Set("X-Prebid", "pbs-go/unknown")
+				h.Set("Observe-Browsing-Topics", "?1")
 			},
 		},
 	}
@@ -1190,6 +1211,9 @@ func TestVideoAuctionResponseHeaders(t *testing.T) {
 		requestBody := readVideoTestFile(t, test.givenTestFile)
 
 		httpReq := httptest.NewRequest("POST", "/openrtb2/video", strings.NewReader(requestBody))
+		for k, v := range test.givenHeader {
+			httpReq.Header.Add(k, v)
+		}
 		recorder := httptest.NewRecorder()
 
 		endpoint.VideoAuctionEndpoint(recorder, httpReq, nil)
@@ -1210,7 +1234,7 @@ func mockDepsWithMetrics(t *testing.T, ex *mockExchangeVideo) (*endpointDeps, *m
 	deps := &endpointDeps{
 		fakeUUIDGenerator{},
 		ex,
-		mockBidderParamValidator{},
+		ortb.NewRequestValidator(openrtb_ext.BuildBidderMap(), map[string]string{}, mockBidderParamValidator{}),
 		&mockVideoStoredReqFetcher{},
 		&mockVideoStoredReqFetcher{},
 		&mockAccountFetcher{data: mockVideoAccountData},
@@ -1255,11 +1279,13 @@ func (m *mockAnalyticsModule) LogAmpObject(ao *analytics.AmpObject, _ privacy.Ac
 func (m *mockAnalyticsModule) LogNotificationEventObject(ne *analytics.NotificationEvent, _ privacy.ActivityControl) {
 }
 
+func (m *mockAnalyticsModule) Shutdown() {}
+
 func mockDeps(t *testing.T, ex *mockExchangeVideo) *endpointDeps {
 	return &endpointDeps{
 		fakeUUIDGenerator{},
 		ex,
-		mockBidderParamValidator{},
+		ortb.NewRequestValidator(openrtb_ext.BuildBidderMap(), map[string]string{}, mockBidderParamValidator{}),
 		&mockVideoStoredReqFetcher{},
 		&mockVideoStoredReqFetcher{},
 		&mockAccountFetcher{data: mockVideoAccountData},
@@ -1284,7 +1310,7 @@ func mockDepsAppendBidderNames(t *testing.T, ex *mockExchangeAppendBidderNames) 
 	deps := &endpointDeps{
 		fakeUUIDGenerator{},
 		ex,
-		mockBidderParamValidator{},
+		ortb.NewRequestValidator(openrtb_ext.BuildBidderMap(), map[string]string{}, mockBidderParamValidator{}),
 		&mockVideoStoredReqFetcher{},
 		&mockVideoStoredReqFetcher{},
 		empty_fetcher.EmptyFetcher{},
@@ -1311,7 +1337,7 @@ func mockDepsNoBids(t *testing.T, ex *mockExchangeVideoNoBids) *endpointDeps {
 	edep := &endpointDeps{
 		fakeUUIDGenerator{},
 		ex,
-		mockBidderParamValidator{},
+		ortb.NewRequestValidator(openrtb_ext.BuildBidderMap(), map[string]string{}, mockBidderParamValidator{}),
 		&mockVideoStoredReqFetcher{},
 		&mockVideoStoredReqFetcher{},
 		empty_fetcher.EmptyFetcher{},
@@ -1471,4 +1497,19 @@ func readVideoTestFile(t *testing.T, filename string) string {
 	}
 
 	return string(getRequestPayload(t, requestData))
+}
+
+func TestVideoRequestValidationFailed(t *testing.T) {
+	ex := &mockExchangeVideo{}
+	reqBody := readVideoTestFile(t, "sample-requests/video/video_invalid_sample_negative_tmax.json")
+	req := httptest.NewRequest("POST", "/openrtb2/video", strings.NewReader(reqBody))
+	recorder := httptest.NewRecorder()
+
+	deps := mockDeps(t, ex)
+	deps.VideoAuctionEndpoint(recorder, req, nil)
+
+	errorMessage := recorder.Body.String()
+
+	assert.Equal(t, 500, recorder.Code, "Should catch error in request")
+	assert.Equal(t, "Critical error while running the video endpoint:  request.tmax must be nonnegative. Got -2", errorMessage, "Incorrect request validation message")
 }

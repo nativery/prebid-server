@@ -16,29 +16,29 @@ import (
 	"github.com/julienschmidt/httprouter"
 	"github.com/prebid/openrtb/v20/openrtb2"
 	"github.com/prebid/openrtb/v20/openrtb3"
-	"github.com/prebid/prebid-server/v2/hooks/hookexecution"
-	"github.com/prebid/prebid-server/v2/ortb"
-	"github.com/prebid/prebid-server/v2/util/uuidutil"
+	"github.com/prebid/prebid-server/v3/hooks/hookexecution"
+	"github.com/prebid/prebid-server/v3/ortb"
+	"github.com/prebid/prebid-server/v3/util/uuidutil"
 	jsonpatch "gopkg.in/evanphx/json-patch.v4"
 
-	accountService "github.com/prebid/prebid-server/v2/account"
-	"github.com/prebid/prebid-server/v2/amp"
-	"github.com/prebid/prebid-server/v2/analytics"
-	"github.com/prebid/prebid-server/v2/config"
-	"github.com/prebid/prebid-server/v2/errortypes"
-	"github.com/prebid/prebid-server/v2/exchange"
-	"github.com/prebid/prebid-server/v2/gdpr"
-	"github.com/prebid/prebid-server/v2/hooks"
-	"github.com/prebid/prebid-server/v2/metrics"
-	"github.com/prebid/prebid-server/v2/openrtb_ext"
-	"github.com/prebid/prebid-server/v2/privacy"
-	"github.com/prebid/prebid-server/v2/stored_requests"
-	"github.com/prebid/prebid-server/v2/stored_requests/backends/empty_fetcher"
-	"github.com/prebid/prebid-server/v2/stored_responses"
-	"github.com/prebid/prebid-server/v2/usersync"
-	"github.com/prebid/prebid-server/v2/util/iputil"
-	"github.com/prebid/prebid-server/v2/util/jsonutil"
-	"github.com/prebid/prebid-server/v2/version"
+	accountService "github.com/prebid/prebid-server/v3/account"
+	"github.com/prebid/prebid-server/v3/amp"
+	"github.com/prebid/prebid-server/v3/analytics"
+	"github.com/prebid/prebid-server/v3/config"
+	"github.com/prebid/prebid-server/v3/errortypes"
+	"github.com/prebid/prebid-server/v3/exchange"
+	"github.com/prebid/prebid-server/v3/gdpr"
+	"github.com/prebid/prebid-server/v3/hooks"
+	"github.com/prebid/prebid-server/v3/metrics"
+	"github.com/prebid/prebid-server/v3/openrtb_ext"
+	"github.com/prebid/prebid-server/v3/privacy"
+	"github.com/prebid/prebid-server/v3/stored_requests"
+	"github.com/prebid/prebid-server/v3/stored_requests/backends/empty_fetcher"
+	"github.com/prebid/prebid-server/v3/stored_responses"
+	"github.com/prebid/prebid-server/v3/usersync"
+	"github.com/prebid/prebid-server/v3/util/iputil"
+	"github.com/prebid/prebid-server/v3/util/jsonutil"
+	"github.com/prebid/prebid-server/v3/version"
 )
 
 const defaultAmpRequestTimeoutMillis = 900
@@ -59,7 +59,7 @@ type ORTB2 struct {
 func NewAmpEndpoint(
 	uuidGenerator uuidutil.UUIDGenerator,
 	ex exchange.Exchange,
-	validator openrtb_ext.BidderParamValidator,
+	requestValidator ortb.RequestValidator,
 	requestsById stored_requests.Fetcher,
 	accounts stored_requests.AccountFetcher,
 	cfg *config.Configuration,
@@ -73,7 +73,7 @@ func NewAmpEndpoint(
 	tmaxAdjustments *exchange.TmaxAdjustmentsPreprocessed,
 ) (httprouter.Handle, error) {
 
-	if ex == nil || validator == nil || requestsById == nil || accounts == nil || cfg == nil || metricsEngine == nil {
+	if ex == nil || requestValidator == nil || requestsById == nil || accounts == nil || cfg == nil || metricsEngine == nil {
 		return nil, errors.New("NewAmpEndpoint requires non-nil arguments.")
 	}
 
@@ -87,7 +87,7 @@ func NewAmpEndpoint(
 	return httprouter.Handle((&endpointDeps{
 		uuidGenerator,
 		ex,
-		validator,
+		requestValidator,
 		requestsById,
 		empty_fetcher.EmptyFetcher{},
 		accounts,
@@ -156,6 +156,7 @@ func (deps *endpointDeps) AmpAuction(w http.ResponseWriter, r *http.Request, _ h
 	w.Header().Set("AMP-Access-Control-Allow-Source-Origin", origin)
 	w.Header().Set("Access-Control-Expose-Headers", "AMP-Access-Control-Allow-Source-Origin")
 	w.Header().Set("X-Prebid", version.BuildXPrebidHeader(version.Ver))
+	setBrowsingTopicsHeader(w, r)
 
 	// There is no body for AMP requests, so we pass a nil body and ignore the return value.
 	_, rejectErr := hookExecutor.ExecuteEntrypointStage(r, nilBody)
@@ -210,9 +211,9 @@ func (deps *endpointDeps) AmpAuction(w http.ResponseWriter, r *http.Request, _ h
 		metricsStatus := metrics.RequestStatusBadInput
 		for _, er := range errL {
 			errCode := errortypes.ReadCode(er)
-			if errCode == errortypes.BlacklistedAppErrorCode || errCode == errortypes.AccountDisabledErrorCode {
+			if errCode == errortypes.BlockedAppErrorCode || errCode == errortypes.AccountDisabledErrorCode {
 				httpStatus = http.StatusServiceUnavailable
-				metricsStatus = metrics.RequestStatusBlacklisted
+				metricsStatus = metrics.RequestStatusBlockedApp
 				break
 			}
 			if errCode == errortypes.MalformedAcctErrorCode {
@@ -230,8 +231,13 @@ func (deps *endpointDeps) AmpAuction(w http.ResponseWriter, r *http.Request, _ h
 		return
 	}
 
-	hasStoredResponses := len(storedAuctionResponses) > 0
-	errs := deps.validateRequest(account, r, reqWrapper, true, hasStoredResponses, storedBidResponses, false)
+	// Populate any "missing" OpenRTB fields with info from other sources, (e.g. HTTP request headers).
+	if errs := deps.setFieldsImplicitly(r, reqWrapper, account); len(errs) > 0 {
+		errL = append(errL, errs...)
+	}
+
+	hasStoredAuctionResponses := len(storedAuctionResponses) > 0
+	errs := deps.validateRequest(account, r, reqWrapper, true, hasStoredAuctionResponses, storedBidResponses, false)
 	errL = append(errL, errs...)
 	ao.Errors = append(ao.Errors, errs...)
 	if errortypes.ContainsFatalError(errs) {
@@ -441,6 +447,9 @@ func getExtBidResponse(
 		warnings = make(map[openrtb_ext.BidderName][]openrtb_ext.ExtBidderMessage)
 	}
 	for _, v := range errortypes.WarningOnly(errs) {
+		if errortypes.ReadScope(v) == errortypes.ScopeDebug && !(reqWrapper != nil && reqWrapper.Test == 1) {
+			continue
+		}
 		bidderErr := openrtb_ext.ExtBidderMessage{
 			Code:    errortypes.ReadCode(v),
 			Message: v.Error(),
@@ -501,8 +510,13 @@ func (deps *endpointDeps) parseAmpRequest(httpRequest *http.Request) (req *openr
 	// move to using the request wrapper
 	req = &openrtb_ext.RequestWrapper{BidRequest: reqNormal}
 
-	// Populate any "missing" OpenRTB fields with info from other sources, (e.g. HTTP request headers).
-	deps.setFieldsImplicitly(httpRequest, req)
+	// normalize to openrtb 2.6
+	if err := openrtb_ext.ConvertUpTo26(req); err != nil {
+		errs = append(errs, err)
+	}
+	if errortypes.ContainsFatalError(errs) {
+		return
+	}
 
 	// Need to ensure cache and targeting are turned on
 	e = initAmpTargetingAndCache(req)
@@ -528,7 +542,7 @@ func (deps *endpointDeps) loadRequestJSONForAmp(httpRequest *http.Request) (req 
 		return nil, nil, nil, nil, []error{err}
 	}
 
-	ctx, cancel := context.WithTimeout(context.Background(), time.Duration(storedRequestTimeoutMillis)*time.Millisecond)
+	ctx, cancel := context.WithTimeout(context.Background(), time.Duration(deps.cfg.StoredRequestsTimeout)*time.Millisecond)
 	defer cancel()
 
 	storedRequests, _, errs := deps.storedReqFetcher.FetchRequests(ctx, []string{ampParams.StoredRequestID}, nil)
