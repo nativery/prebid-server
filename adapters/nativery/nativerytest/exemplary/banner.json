@@ -84,7 +84,7 @@
             {
               "bid": [
                 {
-                  "id": "test-request-id",
+                  "id": "test-bid-id",
                   "impid": "test-imp-id",
                   "price": 1000,
                   "adm": "<div>ad</div>",
@@ -117,7 +117,7 @@
       "bids": [
         {
           "bid": {
-            "id": "test-request-id",
+            "id": "test-bid-id",
             "impid": "test-imp-id",
             "price": 1000,
             "adm": "<div>ad</div>",
@@ -139,5 +139,6 @@
         }
       ]
     }
+    
   ]
 }

@@ -7,11 +7,11 @@ import (
 	"encoding/json"
 
 	"github.com/prebid/openrtb/v20/openrtb2"
-	"github.com/prebid/prebid-server/v2/adapters"
-	"github.com/prebid/prebid-server/v2/config"
-	"github.com/prebid/prebid-server/v2/metrics"
-	"github.com/prebid/prebid-server/v2/openrtb_ext"
-	"github.com/prebid/prebid-server/v2/util/maputil"
+	"github.com/prebid/prebid-server/v3/adapters"
+	"github.com/prebid/prebid-server/v3/config"
+	"github.com/prebid/prebid-server/v3/metrics"
+	"github.com/prebid/prebid-server/v3/openrtb_ext"
+	"github.com/prebid/prebid-server/v3/util/maputil"
 )
 
 // Function used to  builds a new instance of the Nativery adapter for the given bidder with the given config.
@@ -178,7 +178,7 @@ func getMediaTypeForBid(bid *bidExt) (openrtb_ext.BidType, error) {
 	switch bid.Nativery.BidType {
 	case "native":
 		return openrtb_ext.BidTypeNative, nil
-	case "display":
+	case "display", "rich_media", "banner":
 		return openrtb_ext.BidTypeBanner, nil
 	case "video":
 		return openrtb_ext.BidTypeVideo, nil
@@ -248,7 +248,7 @@ func splitRequests(imps []openrtb2.Imp, request *openrtb2.BidRequest, requestExt
 
 		resArr = append(resArr, &adapters.RequestData{
 			Method:  "POST",
-			Uri:     uri,
+			Uri:     uri + "/delivery",
 			Body:    reqJSON,
 			Headers: headers,
 		})
