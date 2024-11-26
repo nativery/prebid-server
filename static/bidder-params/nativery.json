@@ -5,11 +5,11 @@
   
     "type": "object",
     "properties": {
-      "placement_id": {
+      "widgetId": {
         "type": "string",
-        "description": "An ID which identifies this placement of the impression"
+        "description": "An ID which identifies this Nativery widget"
       }
     },
   
-    "required": ["placement_id"]
+    "required": ["widgetId"]
   }

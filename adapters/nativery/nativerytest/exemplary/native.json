@@ -88,7 +88,7 @@
                   "cat": ["IAB13-4"],
                   "ext": {
                     "nativery": {
-                      "brand_id": 1,
+                      "adv_id": 1,
                       "brand_category_id": 1,
                       "bid_ad_media_type": "native"
                     }
@@ -120,7 +120,7 @@
             "cat": ["IAB13-4"],
             "ext": {
               "nativery": {
-                "brand_id": 1,
+                "adv_id": 1,
                 "brand_category_id": 1,
                 "bid_ad_media_type": "native"
               }

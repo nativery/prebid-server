@@ -30,7 +30,7 @@ type bidExtNativery struct {
 	BidType       string   `json:"bid_ad_media_type"`
 	BidAdvDomains []string `json:"bid_adv_domains"`
 
-	BrandId       int `json:"brand_id,omitempty"`
+	AdvertiserId       int `json:"adv_id,omitempty"`
 	BrandCategory int `json:"brand_category_id,omitempty"`
 }
 
