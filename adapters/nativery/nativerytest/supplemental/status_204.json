@@ -14,7 +14,7 @@
         },
         "ext": {
           "bidder": {
-            "placement_id": "1"
+            "widgetId": "1"
           }
         }
       }
@@ -74,7 +74,8 @@
             "h": 500,
             "w": 1000
           }
-        }
+        },
+        "impIDs": ["test-imp-id"]
       },
       "mockResponse": {
         "status": 204,

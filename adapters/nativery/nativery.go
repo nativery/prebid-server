@@ -1,10 +1,10 @@
 package nativery
 
 import (
+	"encoding/json"
 	"fmt"
 	"maps"
 	"net/http"
-	"encoding/json"
 
 	"github.com/prebid/openrtb/v20/openrtb2"
 	"github.com/prebid/prebid-server/v3/adapters"
@@ -14,7 +14,7 @@ import (
 )
 
 // Function used to  builds a new instance of the Nativery adapter for the given bidder with the given config.
-func Builder(bidderName openrtb_ext.BidderName, config config.Adapter, server config.Server) (adapters.Bidder, error) {	
+func Builder(bidderName openrtb_ext.BidderName, config config.Adapter, server config.Server) (adapters.Bidder, error) {
 	// build bidder
 	bidder := &adapter{
 		endpoint: config.Endpoint,
@@ -26,7 +26,7 @@ func Builder(bidderName openrtb_ext.BidderName, config config.Adapter, server co
 // It generates requests for each ad exchange targeted by the BidRequest,
 // serializes the BidRequest into the request body, and sets the appropriate
 // HTTP headers and other parameters.
-func (a *adapter) MakeRequests(request *openrtb2.BidRequest, reqInfo *adapters.ExtraRequestInfo) ([]*adapters.RequestData, []error) {	
+func (a *adapter) MakeRequests(request *openrtb2.BidRequest, reqInfo *adapters.ExtraRequestInfo) ([]*adapters.RequestData, []error) {
 	reqCopy := *request
 	var errs []error
 
@@ -73,7 +73,7 @@ func (a *adapter) MakeRequests(request *openrtb2.BidRequest, reqInfo *adapters.E
 	}
 	// TODO: optimize it, we reiterate imp there and before
 	adapterRequests, errors := splitRequests(reqCopy.Imp, &reqCopy, reqExt, reqExtNativery, a.endpoint)
-	
+
 	return adapterRequests, append(errs, errors...)
 }
 
@@ -250,6 +250,7 @@ func splitRequests(imps []openrtb2.Imp, request *openrtb2.BidRequest, requestExt
 			Uri:     uri,
 			Body:    reqJSON,
 			Headers: headers,
+			ImpIDs:  openrtb_ext.GetImpIDs(request.Imp),
 		})
 	}
 	return resArr, errs
