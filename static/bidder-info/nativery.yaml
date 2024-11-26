@@ -1,13 +1,12 @@
-endpoint: "http://127.0.0.1:3000/v1/pbjs"
+endpoint: "https://hb.nativery.com/openrtb2/auction"
+openrtb:
+  version: 2.6
 maintainer:
   email: "andrea.fassina@nativery.com"
-gvlVendorID: 0000
-disabled: false
-geoscope:
-  - EEA
+gvlVendorID: 1133
 capabilities:
   site:
     mediaTypes:
       - banner
       - native
-userSync:
+      - video
