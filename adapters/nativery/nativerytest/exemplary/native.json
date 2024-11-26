@@ -10,7 +10,7 @@
         },
         "ext": {
           "bidder": {
-            "placement_id": "1"
+            "widgetId": "1"
           }
         }
       }

@@ -4,5 +4,5 @@ package openrtb_ext
 // ref to json schema in static/bidder-params/nativery
 
 type ImpExtNativery struct {
-	PlacementID string `json:"placement_id"`
+	WidgetId string `json:"widgetId"`
 }

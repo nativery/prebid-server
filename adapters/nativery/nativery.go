@@ -95,7 +95,7 @@ func buildNativeryExt(imp *openrtb2.Imp) (openrtb_ext.ImpExtNativery, error) {
 func buildRequest(reqCopy openrtb2.BidRequest, reqExt openrtb_ext.ImpExtNativery) error {
 
 	impExt := impExt{Nativery: nativeryExtReqBody{
-		Id:  reqExt.PlacementID,
+		Id:  reqExt.WidgetId,
 		Xhr: 2,
 		V:   3,
 		// TODO: Site is only for browser request, we have to handle if the req comes from app or dooh
