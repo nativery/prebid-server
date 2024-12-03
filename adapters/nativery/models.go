@@ -23,14 +23,15 @@ type impExt struct {
 }
 
 type bidReqExtNativery struct {
-	IsAMP bool `json:"is_amp"`
+	IsAMP    bool   `json:"isAmp"`
+	WidgetId string `json:"widgetId"`
 }
 
 type bidExtNativery struct {
 	BidType       string   `json:"bid_ad_media_type"`
 	BidAdvDomains []string `json:"bid_adv_domains"`
 
-	AdvertiserId       int `json:"adv_id,omitempty"`
+	AdvertiserId  int `json:"adv_id,omitempty"`
 	BrandCategory int `json:"brand_category_id,omitempty"`
 }
 

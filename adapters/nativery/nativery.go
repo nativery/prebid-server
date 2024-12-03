@@ -36,15 +36,22 @@ func (a *adapter) MakeRequests(request *openrtb2.BidRequest, reqInfo *adapters.E
 		isAMP = 1
 	}
 
+	var widgetId string
+
 	// attach body request for all the impressions
 	validImps := []openrtb2.Imp{}
-	for _, imp := range request.Imp {
+	for i, imp := range request.Imp {
 		reqCopy.Imp = []openrtb2.Imp{imp}
 
 		nativeryExt, err := buildNativeryExt(&reqCopy.Imp[0])
 		if err != nil {
 			errs = append(errs, err)
 			continue
+		}
+
+		// at the first impression set widgetId value
+		if i == 0 {
+			widgetId = nativeryExt.WidgetId
 		}
 
 		if err := buildRequest(reqCopy, nativeryExt); err != nil {
@@ -67,7 +74,7 @@ func (a *adapter) MakeRequests(request *openrtb2.BidRequest, reqInfo *adapters.E
 		return nil, append(errs, err)
 	}
 
-	reqExtNativery, err := getNativeryExt(reqExt, isAMP)
+	reqExtNativery, err := getNativeryExt(reqExt, isAMP, widgetId)
 	if err != nil {
 		return nil, append(errs, err)
 	}
@@ -177,7 +184,7 @@ func getMediaTypeForBid(bid *bidExt) (openrtb_ext.BidType, error) {
 	switch bid.Nativery.BidType {
 	case "native":
 		return openrtb_ext.BidTypeNative, nil
-	case "display":
+	case "display", "banner", "rich_media":
 		return openrtb_ext.BidTypeBanner, nil
 	case "video":
 		return openrtb_ext.BidTypeVideo, nil
@@ -268,7 +275,7 @@ func getRequestExt(ext json.RawMessage) (map[string]json.RawMessage, error) {
 	return extMap, nil
 }
 
-func getNativeryExt(extMap map[string]json.RawMessage, isAMP int) (bidReqExtNativery, error) {
+func getNativeryExt(extMap map[string]json.RawMessage, isAMP int, widgetId string) (bidReqExtNativery, error) {
 	var nativeryExt bidReqExtNativery
 
 	// if ext.nativery already exists return it
@@ -279,6 +286,7 @@ func getNativeryExt(extMap map[string]json.RawMessage, isAMP int) (bidReqExtNati
 	}
 
 	nativeryExt.IsAMP = convertIntToBoolean(&isAMP)
+	nativeryExt.WidgetId = widgetId
 
 	return nativeryExt, nil
 }

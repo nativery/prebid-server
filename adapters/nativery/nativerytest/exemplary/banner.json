@@ -37,7 +37,8 @@
           "id": "test-request-id",
           "ext": {
             "nativery": {
-              "is_amp": false
+              "isAmp": false,
+              "widgetId": "1"
             }
           },
           "imp": [
