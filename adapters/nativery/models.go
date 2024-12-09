@@ -27,12 +27,32 @@ type bidReqExtNativery struct {
 	WidgetId string `json:"widgetId"`
 }
 
+type ImpressionBody struct {
+	WidgetId     string   `json:"idw"`
+	UrlId        string   `json:"idu"`
+	ImpressionId string   `json:"idi"`
+	AdIds        []string `json:"ida"`
+	IsAMP        bool     `json:"isAmp"`
+	Ref          string   `json:"ref"`
+	RefRef       string   `json:"refref"`
+}
+
+type ImpressionOptions struct {
+	Method string         `json:"method"`
+	Body   ImpressionBody `json:"body"`
+}
+type ImpressionData struct {
+	Url     string            `json:"url"`
+	Options ImpressionOptions `json:"options"`
+}
 type bidExtNativery struct {
 	BidType       string   `json:"bid_ad_media_type"`
 	BidAdvDomains []string `json:"bid_adv_domains"`
 
-	AdvertiserId  int `json:"adv_id,omitempty"`
-	BrandCategory int `json:"brand_category_id,omitempty"`
+	AdvertiserId   int            `json:"adv_id,omitempty"`
+	BrandCategory  int            `json:"brand_category_id,omitempty"`
+	Impression     ImpressionData `json:"impression"`
+	RealImpression ImpressionData `json:"realImpression"`
 }
 
 type bidExt struct {
