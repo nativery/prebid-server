@@ -87,11 +87,26 @@
                   "cid": "test-cid",
                   "crid": "test-crid",
                   "cat": ["IAB13-4"],
+                  "mtype": 4,
                   "ext": {
                     "nativery": {
                       "adv_id": 1,
                       "brand_category_id": 1,
-                      "bid_ad_media_type": "native"
+                      "bid_ad_media_type": "native",
+                      "impression": {
+                        "url": "impressionUrl",
+                        "options": {
+                          "body": {},
+                          "method": "POST"
+                        }
+                      },
+                      "realImpression": {
+                        "url": "impressionUrl",
+                        "options": {
+                          "body": {},
+                          "method": "POST"
+                        }
+                      }
                     }
                   }
                 }
@@ -119,11 +134,26 @@
             "cid": "test-cid",
             "crid": "test-crid",
             "cat": ["IAB13-4"],
+            "mtype": 4,
             "ext": {
               "nativery": {
                 "adv_id": 1,
                 "brand_category_id": 1,
-                "bid_ad_media_type": "native"
+                "bid_ad_media_type": "native",
+                "impression": {
+                  "url": "impressionUrl",
+                  "options": {
+                    "body": {},
+                    "method": "POST"
+                  }
+                },
+                "realImpression": {
+                  "url": "impressionUrl",
+                  "options": {
+                    "body": {},
+                    "method": "POST"
+                  }
+                }
               }
             }
           },

@@ -4,13 +4,13 @@
     "imp": [
       {
         "id": "test-imp-id",
-        "banner": {
-          "format": [
-            {
-              "w": 300,
-              "h": 250
-            }
-          ]
+        "video": {
+          "mimes": ["video/mp4"],
+          "minduration": 15,
+          "maxduration": 30,
+          "protocols": [2, 3, 5, 6, 7, 8],
+          "w": 940,
+          "h": 560
         },
         "ext": {
           "bidder": {
@@ -44,13 +44,13 @@
           "imp": [
             {
               "id": "test-imp-id",
-              "banner": {
-                "format": [
-                  {
-                    "w": 300,
-                    "h": 250
-                  }
-                ]
+              "video": {
+                "mimes": ["video/mp4"],
+                "minduration": 15,
+                "maxduration": 30,
+                "protocols": [2, 3, 5, 6, 7, 8],
+                "w": 940,
+                "h": 560
               },
               "ext": {
                 "nativery": {
@@ -89,19 +89,18 @@
                   "id": "test-request-id",
                   "impid": "test-imp-id",
                   "price": 1000,
-                  "adm": "<div>ad</div>",
+                  "nurl": "http://example.com/win/1000",
+                  "adm": "<?xml version=\"1.0\" encoding=\"UTF-8\"?><VAST version=\"4.0\"> ...",
                   "adomain": ["example.com"],
                   "cid": "test-cid",
                   "crid": "test-crid",
                   "cat": ["IAB13-4"],
-                  "w": 300,
-                  "h": 250,
-                  "mtype": 1,
+                  "mtype": 2,
                   "ext": {
                     "nativery": {
                       "adv_id": 1,
                       "brand_category_id": 1,
-                      "bid_ad_media_type": "display",
+                      "bid_ad_media_type": "video",
                       "impression": {
                         "url": "impressionUrl",
                         "options": {
@@ -137,19 +136,18 @@
             "id": "test-request-id",
             "impid": "test-imp-id",
             "price": 1000,
-            "adm": "<div>ad</div>",
+            "nurl": "http://example.com/win/1000",
+            "adm": "<?xml version=\"1.0\" encoding=\"UTF-8\"?><VAST version=\"4.0\"> ...",
             "adomain": ["example.com"],
             "cid": "test-cid",
             "crid": "test-crid",
             "cat": ["IAB13-4"],
-            "w": 300,
-            "h": 250,
-            "mtype": 1,
+            "mtype":2,
             "ext": {
               "nativery": {
                 "adv_id": 1,
                 "brand_category_id": 1,
-                "bid_ad_media_type": "display",
+                "bid_ad_media_type": "video",
                 "impression": {
                   "url": "impressionUrl",
                   "options": {
@@ -167,7 +165,7 @@
               }
             }
           },
-          "type": "banner"
+          "type": "video"
         }
       ]
     }
