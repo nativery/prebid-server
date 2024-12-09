@@ -35,6 +35,7 @@ type ImpressionBody struct {
 	IsAMP        bool     `json:"isAmp"`
 	Ref          string   `json:"ref"`
 	RefRef       string   `json:"refref"`
+	SessionId    string   `json:"sid"`
 }
 
 type ImpressionOptions struct {
