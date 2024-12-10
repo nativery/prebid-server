@@ -99,7 +99,7 @@
                   "mtype": 1,
                   "ext": {
                     "nativery": {
-                      "adv_id": 1,
+                      "adv_id": "1",
                       "brand_category_id": 1,
                       "bid_ad_media_type": "display",
                       "impression": {
@@ -147,7 +147,7 @@
             "mtype": 1,
             "ext": {
               "nativery": {
-                "adv_id": 1,
+                "adv_id": "1",
                 "brand_category_id": 1,
                 "bid_ad_media_type": "display",
                 "impression": {

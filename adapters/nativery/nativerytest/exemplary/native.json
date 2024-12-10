@@ -90,7 +90,7 @@
                   "mtype": 4,
                   "ext": {
                     "nativery": {
-                      "adv_id": 1,
+                      "adv_id": "1",
                       "brand_category_id": 1,
                       "bid_ad_media_type": "native",
                       "impression": {
@@ -137,7 +137,7 @@
             "mtype": 4,
             "ext": {
               "nativery": {
-                "adv_id": 1,
+                "adv_id": "1",
                 "brand_category_id": 1,
                 "bid_ad_media_type": "native",
                 "impression": {
