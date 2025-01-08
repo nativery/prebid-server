@@ -50,10 +50,11 @@ type bidExtNativery struct {
 	BidType       string   `json:"bid_ad_media_type"`
 	BidAdvDomains []string `json:"bid_adv_domains"`
 
-	AdvertiserId   string         `json:"adv_id,omitempty"`
-	BrandCategory  int            `json:"brand_category_id,omitempty"`
-	Impression     ImpressionData `json:"impression"`
-	RealImpression ImpressionData `json:"realImpression"`
+	AdvertiserId     string         `json:"adv_id,omitempty"`
+	BrandCategory    int            `json:"brand_category_id,omitempty"`
+	Impression       ImpressionData `json:"impression"`
+	RealImpression   ImpressionData `json:"realImpression"`
+	RealImpressionAd ImpressionData `json:"realImpressionAd"`
 }
 
 type bidExt struct {

@@ -106,6 +106,13 @@
                           "body": {},
                           "method": "POST"
                         }
+                      },
+                      "realImpressionAd": {
+                        "url": "impressionAdUrl",
+                        "options": {
+                          "body": {},
+                          "method": "POST"
+                        }
                       }
                     }
                   }
@@ -149,6 +156,13 @@
                 },
                 "realImpression": {
                   "url": "impressionUrl",
+                  "options": {
+                    "body": {},
+                    "method": "POST"
+                  }
+                },
+                "realImpressionAd": {
+                  "url": "impressionAdUrl",
                   "options": {
                     "body": {},
                     "method": "POST"

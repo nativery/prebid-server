@@ -114,6 +114,13 @@
                           "body": {},
                           "method": "POST"
                         }
+                      },
+                      "realImpressionAd": {
+                        "url": "impressionAdUrl",
+                        "options": {
+                          "body": {},
+                          "method": "POST"
+                        }
                       }
                     }
                   }
@@ -142,7 +149,7 @@
             "cid": "test-cid",
             "crid": "test-crid",
             "cat": ["IAB13-4"],
-            "mtype":2,
+            "mtype": 2,
             "ext": {
               "nativery": {
                 "adv_id": "1",
@@ -157,6 +164,13 @@
                 },
                 "realImpression": {
                   "url": "impressionUrl",
+                  "options": {
+                    "body": {},
+                    "method": "POST"
+                  }
+                },
+                "realImpressionAd": {
+                  "url": "impressionAdUrl",
                   "options": {
                     "body": {},
                     "method": "POST"
