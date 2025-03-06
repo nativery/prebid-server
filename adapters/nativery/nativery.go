@@ -2,6 +2,7 @@ package nativery
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"maps"
 	"net/http"
@@ -123,7 +124,16 @@ func buildRequest(reqCopy openrtb2.BidRequest, reqExt openrtb_ext.ImpExtNativery
 func (a *adapter) MakeBids(internalRequest *openrtb2.BidRequest, externalRequest *adapters.RequestData, response *adapters.ResponseData) (*adapters.BidderResponse, []error) {
 	// check if the response has no content
 	if adapters.IsResponseStatusCodeNoContent(response) {
-		return nil, nil
+		// Extract nativery no content reason if is present
+		reason := ""
+		if response.Headers != nil {
+			reason = response.Headers.Get("X-Nativery-Error")
+		}
+		if reason == "" {
+			reason = "No Content"
+		}
+		// Add the reason to errors
+		return nil, []error{errors.New(reason)}
 	}
 
 	// check if the response has errors

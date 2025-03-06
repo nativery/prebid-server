@@ -80,10 +80,18 @@
       },
       "mockResponse": {
         "status": 204,
-        "body": {}
+        "body": {},
+        "error": ["No Content"]
       }
     }
   ],
 
-  "expectedBidResponses": []
+  "expectedBidResponses": [],
+
+  "expectedMakeBidsErrors": [
+    {
+      "value": "No Content",
+      "comparison": "literal"
+    }
+  ]
 }
