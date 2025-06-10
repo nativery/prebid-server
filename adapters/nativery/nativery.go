@@ -54,13 +54,21 @@ func (a *adapter) MakeRequests(request *openrtb2.BidRequest, reqInfo *adapters.E
 			widgetId = nativeryExt.WidgetId
 		}
 
-		if err := buildRequest(reqCopy, nativeryExt); err != nil {
+		reqCopy.Imp = []openrtb2.Imp{imp}
+		reqCopy.Imp[0].Ext, err = jsonutil.Marshal(impExt{Nativery: nativeryExtReqBody{
+			Id:     nativeryExt.WidgetId,
+			Xhr:    2,
+			V:      3,
+			Ref:    reqCopy.Site.Page,
+			RefRef: refRef{Page: reqCopy.Site.Page, Ref: reqCopy.Site.Ref},
+		}})
+
+		if err != nil {
 			errs = append(errs, err)
 			continue
 		}
 
-		validImps = append(validImps, imp)
-
+		validImps = append(validImps, reqCopy.Imp[0])
 	}
 
 	reqCopy.Imp = validImps
@@ -95,23 +103,6 @@ func buildNativeryExt(imp *openrtb2.Imp) (openrtb_ext.ImpExtNativery, error) {
 	}
 
 	return nativeryExt, nil
-}
-
-// utility function used to build the body for the http request for a single impression
-func buildRequest(reqCopy openrtb2.BidRequest, reqExt openrtb_ext.ImpExtNativery) error {
-
-	impExt := impExt{Nativery: nativeryExtReqBody{
-		Id:     reqExt.WidgetId,
-		Xhr:    2,
-		V:      3,
-		Ref:    reqCopy.Site.Page,
-		RefRef: refRef{Page: reqCopy.Site.Page, Ref: reqCopy.Site.Ref},
-	}}
-
-	var err error
-	reqCopy.Imp[0].Ext, err = jsonutil.Marshal(&impExt)
-
-	return err
 }
 
 // makebids handles the entire bidding process for a single BidRequest.
