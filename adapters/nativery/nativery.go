@@ -40,7 +40,7 @@ func (a *adapter) MakeRequests(request *openrtb2.BidRequest, reqInfo *adapters.E
 	var widgetId string
 
 	// attach body request for all the impressions
-	validImps := []openrtb2.Imp{}
+	validImps := make([]openrtb2.Imp, 0, len(request.Imp))
 	for i, imp := range request.Imp {
 		nativeryExt, err := buildNativeryExt(&imp)
 
@@ -54,14 +54,12 @@ func (a *adapter) MakeRequests(request *openrtb2.BidRequest, reqInfo *adapters.E
 			widgetId = nativeryExt.WidgetId
 		}
 
-		reqCopy.Imp = []openrtb2.Imp{imp}
-
 		if err := buildRequest(reqCopy, nativeryExt); err != nil {
 			errs = append(errs, err)
 			continue
 		}
 
-		validImps = append(validImps, reqCopy.Imp...)
+		validImps = append(validImps, imp)
 
 	}
 
@@ -80,9 +78,9 @@ func (a *adapter) MakeRequests(request *openrtb2.BidRequest, reqInfo *adapters.E
 	if err != nil {
 		return nil, append(errs, err)
 	}
-	adapterRequests, errors := splitRequests(reqCopy.Imp, &reqCopy, reqExt, reqExtNativery, a.endpoint)
+	adapterRequests, splitErrors := splitRequests(reqCopy.Imp, &reqCopy, reqExt, reqExtNativery, a.endpoint)
 
-	return adapterRequests, append(errs, errors...)
+	return adapterRequests, append(errs, splitErrors...)
 }
 
 func buildNativeryExt(imp *openrtb2.Imp) (openrtb_ext.ImpExtNativery, error) {
@@ -202,17 +200,6 @@ func getMediaTypeForBid(bid *bidExt) (openrtb_ext.BidType, error) {
 	}
 }
 
-func convertIntToBoolean(num *int) bool {
-	var b bool
-	// Dereferenzia num usando *
-	if num != nil && *num == 1 {
-		b = true
-	} else {
-		b = false
-	}
-	return b
-}
-
 func buildBidMeta(mediaType string, advDomain []string) *openrtb_ext.ExtBidPrebidMeta {
 
 	//advertiserDomains and dchain are encouraged to implements
@@ -309,7 +296,7 @@ func getNativeryExt(extMap map[string]jsonutil.RawMessage, isAMP int, widgetId s
 		}
 	}
 
-	nativeryExt.IsAMP = convertIntToBoolean(&isAMP)
+	nativeryExt.IsAMP = isAMP == 1
 	nativeryExt.WidgetId = widgetId
 
 	return nativeryExt, nil
