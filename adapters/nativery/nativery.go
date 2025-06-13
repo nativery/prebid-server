@@ -117,8 +117,8 @@ func (a *adapter) MakeRequests(request *openrtb2.BidRequest, reqInfo *adapters.E
 			widgetId = nativeryExt.WidgetId
 		}
 
-		reqCopy.Imp = []openrtb2.Imp{imp}
-		reqCopy.Imp[0].Ext, err = jsonutil.Marshal(impExt{Nativery: nativeryExtReqBody{
+		impCopy := imp
+		impCopy.Ext, err = jsonutil.Marshal(impExt{Nativery: nativeryExtReqBody{
 			Id:     nativeryExt.WidgetId,
 			Xhr:    2,
 			V:      3,
@@ -131,7 +131,7 @@ func (a *adapter) MakeRequests(request *openrtb2.BidRequest, reqInfo *adapters.E
 			continue
 		}
 
-		validImps = append(validImps, reqCopy.Imp[0])
+		validImps = append(validImps, impCopy)
 	}
 
 	reqCopy.Imp = validImps
